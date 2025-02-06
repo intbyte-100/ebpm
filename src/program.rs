@@ -1,9 +1,8 @@
 use std::{
     collections::HashMap,
     env::{self, args},
-    fs::File,
-    fs::{self, create_dir},
-    io::{stdin, stdout, Write},
+    fs::{self, create_dir, File},
+    io::{stdin, stdout, BufReader, Read, Write},
     os::unix::fs::PermissionsExt,
     path::PathBuf,
     process::{exit, Command},
@@ -32,6 +31,28 @@ impl Program {
             install_script: String::new(),
             remove_script: String::new(),
         }
+    }
+
+    pub(crate) fn load(name: &str) -> Self {
+        let path = std::env::home_dir()
+            .unwrap()
+            .join("Applications")
+            .join(name.to_string() + ".json");
+
+        let file = std::fs::File::open(path).unwrap_or_else(|_e| {
+            println!("Program '{}' doesn't exist!", name);
+            exit(-1);
+        });
+        let mut reader = BufReader::new(file);
+        let mut json = String::new();
+        reader.read_to_string(&mut json).unwrap();
+
+        let program: Program = serde_json::from_str(&json.as_str()).unwrap_or_else(|e| {
+            println!("JSON manifest parsing error: {}", e);
+            exit(-1);
+        });
+
+        program
     }
 
     pub(crate) fn install(&self) {
@@ -206,7 +227,7 @@ impl ProgramResources {
         ProgramResources {
             res_path: res,
             exe_path: exe,
-            manifest: manifest,
+            manifest,
         }
     }
 }

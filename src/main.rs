@@ -76,7 +76,7 @@ fn new_program(args: &Vec<String>) {
             .unwrap();
     }
 
-    Command::new("micro")
+    Command::new("nano")
         .arg(args[2].to_string() + ".json")
         .spawn()
         .unwrap()
@@ -86,7 +86,7 @@ fn new_program(args: &Vec<String>) {
 
     if install {
         let path = env::current_dir().unwrap();
-        let mut program = install_program_from_files(path.as_path(), args[2].as_str());
+        let mut program = install_program_from_unpacked_files(path.as_path(), args[2].as_str());
         if request_yes_or_no("Do you want to remove package files?") {
             println!("Removing files:");
             program.files.push(args[2].as_str().to_string() + ".json");
@@ -110,12 +110,12 @@ pub(crate) fn install_program(args: &Vec<String>) {
             .skip(2)
             .filter(|t| t.as_str() != "-f")
             .for_each(|it| {
-                install_program_from_files(Path::new(dir.as_path()), it.as_str());
+                install_program_from_unpacked_files(Path::new(dir.as_path()), it.as_str());
             })
     }
 }
 
-fn install_program_from_files(path: &Path, name: &str) -> Program {
+fn install_program_from_unpacked_files(path: &Path, name: &str) -> Program {
     let dir = path.to_path_buf();
     let program = get_program_from_path(&dir, name);
 
@@ -124,7 +124,7 @@ fn install_program_from_files(path: &Path, name: &str) -> Program {
 }
 
 fn remove_program(args: &Vec<String>) {
-    get_program(&args[2]).remove();
+    Program::load(&args[2]).remove();
 }
 
 fn print_list(args: &Vec<String>) {
@@ -141,7 +141,7 @@ fn print_list(args: &Vec<String>) {
         .map(|it| it.unwrap().file_name().into_string().unwrap())
         .filter(|it| it.ends_with(".json"))
         .for_each(|it| {
-            let program = get_program(it.strip_suffix(".json").unwrap());
+            let program = Program::load(it.strip_suffix(".json").unwrap());
             let resourse = ProgramResources::from(&program);
 
             print!("--- {}", program.name);
@@ -185,12 +185,6 @@ fn get_program_from_path(path: &Path, name: &str) -> Program {
     program
 }
 
-fn get_program(name: &str) -> Program {
-    let mut path = std::env::home_dir().unwrap();
-    path.push("Applications");
-    get_program_from_path(&path, name)
-}
-
 fn run_program(args: &Vec<String>) {
-    get_program(&args[2]).run()
+    Program::load(&args[2]).run()
 }
