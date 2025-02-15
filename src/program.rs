@@ -14,6 +14,28 @@ use serde::{Deserialize, Serialize};
 use crate::util::copy;
 
 #[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct Manifest {
+    pub(crate) name: String,
+    pub(crate) files: Vec<String>,
+    cmd: String,
+    install_script: String,
+    remove_script: String,
+} 
+
+
+
+impl TryFrom<File> for Manifest {
+    type Error = serde_json::Error;
+    
+    fn try_from(value: File) -> Result<Self, Self::Error> {
+        let mut reader = BufReader::new(value);
+        let mut json = String::new();
+        reader.read_to_string(&mut json).unwrap();
+        serde_json::from_str(json.as_str())
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct Program {
     pub(crate) name: String,
     pub(crate) files: Vec<String>,
@@ -54,6 +76,8 @@ impl Program {
 
         program
     }
+    
+    
 
     pub(crate) fn install(&self) {
         println!("Installing {}...", &self.name);
@@ -185,28 +209,29 @@ impl ProgramResources {
         };
     }
 
-    pub(crate) fn from(program: &Program) -> Self {
+    pub fn new(name: &str) -> Self {
         let mut res = env::home_dir().unwrap();
         res.push("Applications");
         Self::create_dir(&res);
         let mut exe = res.clone();
-
+        
         res.push("res");
         Self::create_dir(&res);
-        res.push(&program.name);
+        res.push(name);
         Self::create_dir(&res);
 
         exe.push("exe");
         Self::create_dir(&exe);
 
-        exe.push(&program.name);
+        
+        exe.push(name);
 
         let mut _file = match std::fs::metadata(exe.clone()) {
             Err(_) => {
                 let mut file = File::create(exe.clone()).unwrap();
                 file.write(b"#!/bin/bash\n").unwrap();
                 file.write(b"ebpm run ").unwrap();
-                file.write(program.name.as_bytes()).unwrap();
+                file.write(name.as_bytes()).unwrap();
                 file.write(b" $@").unwrap();
                 fs::set_permissions(exe.clone(), fs::Permissions::from_mode(0o770)).unwrap();
             }
@@ -223,11 +248,16 @@ impl ProgramResources {
 
         let mut manifest = env::home_dir().unwrap();
         manifest.push("Applications");
-        manifest.push(program.name.clone() + ".json");
+        manifest.push(name.to_string() + ".json");
         ProgramResources {
             res_path: res,
             exe_path: exe,
             manifest,
         }
+    }
+    
+    #[deprecated]
+    pub(crate) fn from(program: &Program) -> Self {
+        Self::new(&program.name)
     }
 }

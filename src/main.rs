@@ -1,11 +1,10 @@
 mod program;
 mod util;
+mod package;
+mod filetransfer;
 
 use std::{
-    env, fs,
-    io::{BufReader, Read, Write},
-    path::Path,
-    process::{exit, Command},
+    collections::HashSet, env, fs, io::{BufReader, Read, Write}, path::Path, process::{exit, Command}
 };
 
 use fs_extra::dir::get_size;
@@ -34,6 +33,8 @@ fn main() {
         return;
     }
 
+
+    
     match args[1].as_str() {
         "new" => new_program(&args),
         "help" => print_help(),
@@ -108,7 +109,7 @@ pub(crate) fn install_program(args: &Vec<String>) {
     if args.iter().filter(|it| it.as_str() == "-f").count() > 0 {
         args.iter()
             .skip(2)
-            .filter(|t| t.as_str() != "-f")
+            .filter(|t| t.as_str() != "-fa")
             .for_each(|it| {
                 install_program_from_unpacked_files(Path::new(dir.as_path()), it.as_str());
             })
