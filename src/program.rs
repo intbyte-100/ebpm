@@ -1,32 +1,39 @@
 use std::{
     collections::HashMap,
-    env::{self, args},
+    env::{self},
     fs::{self, create_dir, File},
-    io::{stdin, stdout, BufReader, Read, Write},
+    io::{BufReader, Read, Write},
     os::unix::fs::PermissionsExt,
     path::PathBuf,
     process::{exit, Command},
 };
 
-use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
-use crate::util::copy;
-
 #[derive(Serialize, Deserialize, Clone)]
-pub(crate) struct Manifest {
-    pub(crate) name: String,
-    pub(crate) files: Vec<String>,
-    cmd: String,
-    install_script: String,
+pub struct Manifest {
+    pub name: String,
+    pub files: Vec<String>,
+    pub install_script: String,
     remove_script: String,
-} 
+    cmd: String,
+}
 
-
+impl Manifest {
+    pub fn new(name: String, files: &Vec<String>) -> Self {
+        Self {
+            name,
+            files: files.clone(),
+            cmd: String::new(),
+            install_script: String::new(),
+            remove_script: String::new(),
+        }
+    }
+}
 
 impl TryFrom<File> for Manifest {
     type Error = serde_json::Error;
-    
+
     fn try_from(value: File) -> Result<Self, Self::Error> {
         let mut reader = BufReader::new(value);
         let mut json = String::new();
@@ -45,16 +52,6 @@ pub(crate) struct Program {
 }
 
 impl Program {
-    pub(crate) fn new(name: String, files: &Vec<String>) -> Self {
-        Program {
-            name: name,
-            files: files.clone(),
-            cmd: String::new(),
-            install_script: String::new(),
-            remove_script: String::new(),
-        }
-    }
-
     pub(crate) fn load(name: &str) -> Self {
         let path = std::env::home_dir()
             .unwrap()
@@ -75,61 +72,6 @@ impl Program {
         });
 
         program
-    }
-    
-    
-
-    pub(crate) fn install(&self) {
-        println!("Installing {}...", &self.name);
-        let dir = env::current_dir().unwrap();
-        let resource = ProgramResources::from(self);
-        let mut manifest = PathBuf::from(dir);
-        manifest.push(self.name.clone() + ".json");
-        Command::new("cp")
-            .arg(manifest)
-            .arg(resource.manifest)
-            .spawn()
-            .unwrap();
-
-        if !self.files.is_empty() {
-            println!("Copying files:");
-            let error = self
-                .files
-                .iter()
-                .map(|file| {
-                    print!("{}", format!("    copying {}... ", file));
-                    stdout().flush().unwrap();
-                    match copy(file, &resource.res_path) {
-                        Ok(_) => {
-                            println!("[Success]");
-                            false
-                        }
-                        Err(e) => {
-                            println!("[Error: {}]", e.kind());
-                            true
-                        }
-                    }
-                })
-                .find(|it| *it)
-                .is_some();
-
-            if error {
-                println!("{}", "Error: instalation failed.".red());
-                let program = (*self).clone();
-                program.remove();
-                exit(-1);
-            }
-        }
-
-        if self.install_script.len() > 0 {
-            Command::new("bash")
-                .current_dir(&resource.res_path)
-                .arg(&self.install_script)
-                .spawn()
-                .unwrap()
-                .wait()
-                .unwrap();
-        }
     }
 
     pub(crate) fn run(&self) {
@@ -214,7 +156,7 @@ impl ProgramResources {
         res.push("Applications");
         Self::create_dir(&res);
         let mut exe = res.clone();
-        
+
         res.push("res");
         Self::create_dir(&res);
         res.push(name);
@@ -223,7 +165,6 @@ impl ProgramResources {
         exe.push("exe");
         Self::create_dir(&exe);
 
-        
         exe.push(name);
 
         let mut _file = match std::fs::metadata(exe.clone()) {
@@ -255,7 +196,7 @@ impl ProgramResources {
             manifest,
         }
     }
-    
+
     #[deprecated]
     pub(crate) fn from(program: &Program) -> Self {
         Self::new(&program.name)

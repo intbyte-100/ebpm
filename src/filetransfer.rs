@@ -1,5 +1,6 @@
 use std::{fs, io, path::Path};
 
+#[derive(Copy, Clone)]
 pub(crate) enum TransferStrategy {
     Move,
     Copy,
@@ -10,7 +11,7 @@ pub struct FilesTransfer {
 }
 
 impl FilesTransfer {
-    fn move_or_copy(&self, src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
+    pub fn transfer_file(&self, src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
         match self.strategy {
             TransferStrategy::Move => fs::rename(src, dst)?,
             TransferStrategy::Copy => {
@@ -31,7 +32,7 @@ impl FilesTransfer {
             if ty.is_dir() {
                 self.recoursive_copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
             } else {
-                self.move_or_copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+                self.transfer_file(entry.path(), dst.as_ref().join(entry.file_name()))?;
             }
         }
         Ok(())
@@ -41,7 +42,7 @@ impl FilesTransfer {
         if let Ok(file) = fs::metadata(&src) {
             if file.is_file() {
                 let file = src.as_ref().file_name().unwrap();
-                self.move_or_copy(src.as_ref(), dst.as_ref().join(file))?;
+                self.transfer_file(src.as_ref(), dst.as_ref().join(file))?;
                 return Ok(());
             }
         }
