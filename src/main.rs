@@ -2,20 +2,21 @@ mod filetransfer;
 mod package;
 mod program;
 mod util;
+mod zip;
 
 use std::{
     env,
     fs::{self},
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
     process::{exit, Command},
 };
 
 use filetransfer::TransferStrategy;
-use fs_extra::dir::get_size;
-use package::UnpackedPackage;
+
+use package::{Package, UnpackedPackage};
 use program::{Manifest, Program};
-use util::request_yes_or_no;
+use util::{request_yes_or_no, GetSize};
 
 use crate::program::ProgramResources;
 
@@ -28,6 +29,7 @@ fn print_help() {
     println!("    remove [program_name] - remove a program");
     println!("    list - list all installed programs");
     println!("    run [program_name] - run a program");
+    println!("    build - build a package");
     println!();
     println!("Example: ebpm new my_program");
 }
@@ -46,6 +48,7 @@ fn main() {
         "remove" => remove_program(&args),
         "run" => run_program(&args),
         "list" => print_list(),
+        "build" => build_package(),
 
         _ => {
             println!("Invalid arguments");
@@ -55,11 +58,9 @@ fn main() {
     }
 }
 
-#[inline]
-pub(crate) fn input_string() -> String {
-    let mut string = String::new();
-    std::io::stdin().read_line(&mut string).unwrap();
-    string
+fn build_package() {
+    let package = UnpackedPackage::try_from(env::current_dir().unwrap().as_path()).unwrap();
+    package.pack();
 }
 
 fn new_program(args: &Vec<String>) {
@@ -103,10 +104,10 @@ fn new_program(args: &Vec<String>) {
     }
 }
 
-pub(crate) fn install_program(args: &Vec<String>) {
-    let dir = env::current_dir().unwrap();
+fn install_program(args: &Vec<String>) {
+   
 
-    if args.iter().filter(|it| it.as_str() == "-f").count() > 0 {
+    if args.iter().filter(|it| it.as_str() == "-fa").count() > 0 {
         args.iter()
             .skip(2)
             .filter(|t| t.as_str() != "-fa")
@@ -115,8 +116,22 @@ pub(crate) fn install_program(args: &Vec<String>) {
                     .unwrap()
                     .install(TransferStrategy::Copy)
                     .unwrap();
-            })
+            });
+        return;
     }
+
+    if args.iter().filter(|it| it.as_str() == "-f").count() > 0 {
+        args.iter()
+            .skip(2)
+            .filter(|t| t.as_str() != "-f")
+            .map(|it| Package::new(it.into()))
+            .for_each(|it| {
+                println!("installing {}", it.path.file_name().unwrap().to_str().unwrap());
+                it.install().unwrap();
+                println!("Installing finished");
+            });
+    }
+
 }
 
 fn remove_program(args: &Vec<String>) {
@@ -145,7 +160,7 @@ fn print_list() {
             for _ in 0..40 - program.name.len() {
                 print!(" ")
             }
-            let folder_size = get_size(resourse.res_path).unwrap();
+            let folder_size = resourse.res_path.get_size();
             let folder_size = if folder_size < 1024 {
                 format!("Bytes {}", folder_size)
             } else if folder_size < 1024 * 1024 {

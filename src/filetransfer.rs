@@ -13,7 +13,21 @@ pub struct FilesTransfer {
 impl FilesTransfer {
     pub fn transfer_file(&self, src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
         match self.strategy {
-            TransferStrategy::Move => fs::rename(src, dst)?,
+            TransferStrategy::Move => {
+                match fs::rename(src.as_ref(), dst.as_ref()) {
+                    Ok(_) => Ok(()),
+                    Err(_) => match fs::copy(src.as_ref(), dst.as_ref()) {
+                        Ok(_) => fs::remove_file(src).map_err(|err| {
+                            eprintln!("Failed to remove source file: {}", err);
+                            err
+                        }),
+                        Err(err) => {
+                            eprintln!("Failed to copy file: {}", err);
+                            Err(err)
+                        }
+                    },
+                }?;
+            }
             TransferStrategy::Copy => {
                 fs::copy(src, dst)?;
             }
@@ -60,7 +74,8 @@ impl FilesTransfer {
 
     pub fn execute_transfer(&self, files: &Vec<String>, dst: impl AsRef<Path>) -> io::Result<()> {
         for file in files.iter() {
-            self.copy(file, dst.as_ref())?
+            self.copy(file, dst.as_ref())
+                .inspect_err(|err| println!("File: {}; Error: {}", file, err))?
         }
         Ok(())
     }
